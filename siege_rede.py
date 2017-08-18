@@ -1,5 +1,24 @@
-import sys, json, copy, time
+import sys, json, copy, time, socket
 MAX_DEPTH = 3
+UDP_IP = "127.0.0.1"
+UDP_PORT_VERMELHO = 5001
+UDP_PORT_AMARELO = 5002
+sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+sock_rcv = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+
+def envia_msg(msg, porta):
+	sock.sendto(msg.encode('utf-8'), (UDP_IP, porta))
+
+def bind_sock(jogador):
+	if jogador:
+		sock_rcv.bind((UDP_IP, UDP_PORT_AMARELO))
+	else:
+		sock_rcv.bind((UDP_IP, UDP_PORT_VERMELHO))
+
+def recebe():
+	while True:
+		data, addr = sock_rcv.recvfrom(1024) # buffer size is 1024 bytes
+		return data.decode('utf_8')
 
 def load_map(filename):
 	with open(filename) as data_file:    
@@ -319,13 +338,19 @@ def main(argv):
 			print "Informe uma cor: vermelho ou amarelo."
 			sys.exit(0)
 	
+	bind_sock(jogador)
 	inicial = Estado(0)
 	inicial.estado_inicial()
+
+	if jogador:
+		envia_msg('conecta', UDP_PORT_AMARELO)
+	else:
+		envia_msg('conecta', UDP_PORT_VERMELHO)
 
 	# print vizinhos[inicial.pos_vermelhas[0]][0]
 	# print capturas[inicial.pos_vermelhas[0]][0][0]
 
-	jogo(inicial, jogador)
+	# jogo(inicial, jogador)
 
 	return
 
