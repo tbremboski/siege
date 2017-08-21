@@ -1,24 +1,36 @@
-import sys, json, copy, time, socket
+import sys, json, copy, time, socket, random
 MAX_DEPTH = 3
 UDP_IP = "127.0.0.1"
 UDP_PORT_VERMELHO = 5001
 UDP_PORT_AMARELO = 5002
 sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-sock_rcv = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 
 def envia_msg(msg, porta):
 	sock.sendto(msg.encode('utf-8'), (UDP_IP, porta))
 
-def bind_sock(jogador):
-	if jogador:
-		sock_rcv.bind((UDP_IP, UDP_PORT_AMARELO))
-	else:
-		sock_rcv.bind((UDP_IP, UDP_PORT_VERMELHO))
-
 def recebe():
 	while True:
-		data, addr = sock_rcv.recvfrom(1024) # buffer size is 1024 bytes
-		return data.decode('utf_8')
+		data, addr = sock.recvfrom(1024)
+		print data
+		if(data!='' and data!='conectado' and data!='fim' and data!='ok'):
+			return decode_msg(data)
+		elif(data=='fim'):
+			return 'fim'
+		else:
+			return None
+
+def decode_msg(mensagem):
+	print "Mensagem Recebida "+str(mensagem)
+	msg = mensagem.split()
+	if("captura" in msg):
+		return [msg[1],[msg[3],msg[5]]]
+	else:
+		return [msg[1],[msg[3],'']]
+
+def formata_msg(msg):
+	m = msg.split()
+
+	
 
 def load_map(filename):
 	with open(filename) as data_file:    
@@ -40,11 +52,30 @@ def is_final(estado):
 def h(estado, vermelho):
 	pa = len(estado.pos_amarelas) - estado.pos_amarelas.count(None)
 	pv = len(estado.pos_vermelhas) - estado.pos_vermelhas.count(None)
+
+	sumv = 0.0
+	suma = 0.0
+	for pos in estado.pos_vermelhas:
+		if pos is not None:
+			sumv += (ord(pos[0]) - 96)
+	for pos in estado.pos_amarelas:
+		if pos is not None:
+			suma += (ord(pos[0]) - 96)
+	sumv /= pv
+	suma /= pa
+
+	if 'h1' in estado.pos_amarelas:
+		h1 = 1
+	else:
+		h1 = 0
+
+	ha = (pa - pv)*10.0 + h1*1.0 + suma*2.0
+	hv = (pv - pa)*10.0 - h1*1.0 + sumv*2.0
 	
 	if vermelho:
-		return pv - pa
+		return hv
 	else:
-		return pa - pv
+		return ha
 
 def minimax(estado, depth, maximize, alpha, beta, vermelho):
 	if depth == MAX_DEPTH or is_final(estado):
@@ -121,119 +152,6 @@ def get_children(estado, vermelho):
 
 	return r
 
-def turno_jogador(estado_atual, vermelho):
-	done = False
-	massacre = False
-	peca = ''
-	jogada = ''
-	if vermelho:
-		while not done:
-			time.sleep(0.5)
-			while peca not in estado_atual.pos_vermelhas:
-				print "Suas pecas:"
-				print estado_atual.pos_vermelhas
-				print "Pecas inimigas:"
-				print estado_atual.pos_amarelas
-				peca = raw_input("Informe a peca que deseja movimentar: ")
-
-			while jogada not in vizinhos[peca]:
-				print vizinhos[peca]
-				jogada = raw_input("Informe para onde a peca deve ir: ")
-
-			if jogada in estado_atual.pos_amarelas:
-				for c in capturas[peca]:
-					if jogada == c[1]:
-						if c[2] not in estado_atual.pos_vermelhas:
-							if c[2] not in estado_atual.pos_amarelas:
-								estado_atual.pos_vermelhas[estado_atual.pos_vermelhas.index(peca)] = c[2]
-								estado_atual.pos_amarelas[estado_atual.pos_amarelas.index(jogada)] = None
-								print "Capturou " + str(c[1])
-								disponivel = raw_input("Outra captura disponivel? ")
-								if disponivel == 's':
-									peca = ''
-									jogada = ''
-									massacre = True
-								else:
-									done = True
-							else:
-								print "Jogada indisponivel."
-								peca = ''
-								jogada = ''
-								if massacre:
-									done = True
-						else:
-							print "Jogada indisponivel."
-							peca = ''
-							jogada = ''
-							if massacre:
-								done = True
-			elif not massacre:
-				if jogada not in estado_atual.pos_vermelhas:
-					estado_atual.pos_vermelhas[estado_atual.pos_vermelhas.index(peca)] = jogada
-					done = True
-				else:
-					print "Jogada indisponivel."
-					peca = ''
-					jogada = ''
-			else:
-				print "Captura nao disponivel."
-				done = True
-
-	else:
-		time.sleep(0.5)
-		while not done:
-			while peca not in estado_atual.pos_amarelas:
-				print "Suas pecas:"
-				print estado_atual.pos_amarelas
-				print "Pecas inimigas:"
-				print estado_atual.pos_vermelhas
-				peca = raw_input("Informe a peca que deseja movimentar: ")
-
-			while jogada not in vizinhos[peca]:
-				print vizinhos[peca]
-				jogada = raw_input("Informe para onde a peca deve ir: ")
-
-			if jogada in estado_atual.pos_vermelhas:
-				for c in capturas[peca]:
-					if jogada == c[1]:
-						if c[2] not in estado_atual.pos_amarelas:
-							if c[2] not in estado_atual.pos_vermelhas:
-								estado_atual.pos_amarelas[estado_atual.pos_amarelas.index(peca)] = c[2]
-								estado_atual.pos_vermelhas[estado_atual.pos_vermelhas.index(jogada)] = None
-								print "Capturou " + str(c[1])
-								disponivel = raw_input("Outra captura disponivel? ")
-								if disponivel == 's':
-									peca = ''
-									jogada = ''
-									massacre = True
-								else:
-									done = True
-							else:
-								print "Jogada indisponivel."
-								peca = ''
-								jogada = ''
-								if massacre:
-									done = True
-						else:
-							print "Jogada indisponivel."
-							peca = ''
-							jogada = ''
-							if massacre:
-								done = True
-			elif not massacre:
-				if jogada not in estado_atual.pos_amarelas:
-					estado_atual.pos_amarelas[estado_atual.pos_amarelas.index(peca)] = jogada
-					done = True
-				else:
-					print "Jogada indisponivel."
-					peca = ''
-					jogada = ''
-			else:
-				print "Captura nao disponivel."
-				done = True
-
-	return estado_atual
-
 def turno_maquina(estado_atual, vermelho, alpha, beta):
 	values = []
 	children = get_children(estado_atual, vermelho)
@@ -241,36 +159,25 @@ def turno_maquina(estado_atual, vermelho, alpha, beta):
 		values.append(minimax(children[i], 0, False, alpha, beta, vermelho))
 
 	max_value = max(values)
-	max_index = values.index(max_value)
-
-	if vermelho:
-		num_old = estado_atual.pos_amarelas.count(None)
-		old_list = copy.deepcopy(estado_atual.pos_vermelhas)
-	else:
-		num_old = estado_atual.pos_vermelhas.count(None)
-		old_list = copy.deepcopy(estado_atual.pos_amarelas)
+	indices = [i for i, x in enumerate(values) if x == max_value]
+	max_index = random.randint(0, len(indices) - 1)
 
 	estado_atual = copy.deepcopy(children[max_index])
 
-	if vermelho:
-		num_new = estado_atual.pos_amarelas.count(None)
-	else:
-		num_new = estado_atual.pos_vermelhas.count(None)
-
-	if num_old < num_new:
-		estado_atual = massacre(estado_atual, vermelho)
-
+	msg = ''
 	for i in range(len(old_list)):
 		if vermelho:
 			if old_list[i] != estado_atual.pos_vermelhas[i]:
 				print "De: " + str(old_list[i])
 				print "Para: " + str(estado_atual.pos_vermelhas[i])
+				msg = str(old_list[i]) + ' ' + str(estado_atual.pos_vermelhas[i])
 		else:
 			if old_list[i] != estado_atual.pos_amarelas[i]:
 				print "De: " + str(old_list[i])
 				print "Para: " + str(estado_atual.pos_amarelas[i])
+				msg = str(old_list[i]) + ' ' + str(estado_atual.pos_amarelas[i])
 
-	return estado_atual
+	return estado_atual, msg
 
 def jogo(estado, jogador):
 	alpha = -sys.maxint
@@ -285,10 +192,36 @@ def jogo(estado, jogador):
 			print "\nTurno amarelo!"
 			
 		if jogador:
-			estado_atual = turno_jogador(estado_atual, vermelho)
+			if vermelho:
+				num_old = estado_atual.pos_amarelas.count(None)
+				old_list = copy.deepcopy(estado_atual.pos_vermelhas)
+			else:
+				num_old = estado_atual.pos_vermelhas.count(None)
+				old_list = copy.deepcopy(estado_atual.pos_amarelas)
+
+			estado_atual, msg = turno_maquina(estado_atual, vermelho, alpha, beta)
+
+			if vermelho:
+				envia_msg(formata_msg(msg), UDP_PORT_VERMELHO)
+			else:
+				envia_msg(formata_msg(msg), UDP_PORT_AMARELO)
+			recebe()
+
+			if vermelho:
+				num_new = estado_atual.pos_amarelas.count(None)
+			else:
+				num_new = estado_atual.pos_vermelhas.count(None)
+
+			if num_old < num_new:
+				estado_atual = massacre(estado_atual, vermelho)
+
+			
 
 		else:
-			estado_atual = turno_maquina(estado_atual, vermelho, alpha, beta)
+			result = recebe()
+			if result != 'fim' and result != None:
+				print result
+			break
 
 		vermelho = not vermelho
 		jogador = not jogador
@@ -338,19 +271,17 @@ def main(argv):
 			print "Informe uma cor: vermelho ou amarelo."
 			sys.exit(0)
 	
-	bind_sock(jogador)
+	# bind_sock(jogador)
 	inicial = Estado(0)
 	inicial.estado_inicial()
 
 	if jogador:
-		envia_msg('conecta', UDP_PORT_AMARELO)
-	else:
 		envia_msg('conecta', UDP_PORT_VERMELHO)
+	else:
+		envia_msg('conecta', UDP_PORT_AMARELO)
+	recebe()
 
-	# print vizinhos[inicial.pos_vermelhas[0]][0]
-	# print capturas[inicial.pos_vermelhas[0]][0][0]
-
-	# jogo(inicial, jogador)
+	jogo(inicial, jogador)
 
 	return
 
@@ -361,14 +292,14 @@ class Estado:
 		self.pos_amarelas = []
 
 	def estado_inicial(self):
-		for i in range(1,17):
-			tmp = 'a' + str(i)
+		for i in range(1,17,2):
+			tmp = 'd' + str(i)
 			self.pos_vermelhas.append(tmp)
 
 		for i in range(1,9):
-			tmp = 'f' + str(i)
+			# tmp = 'f' + str(i)
 			tmp2 = 'g' + str(i)
-			self.pos_amarelas.append(tmp)
+			# self.pos_amarelas.append(tmp)
 			self.pos_amarelas.append(tmp2)
 
 if __name__ == '__main__':
