@@ -28,8 +28,14 @@ def decode_msg(mensagem):
 		return [msg[1],[msg[3],'']]
 
 def formata_msg(msg):
+	new_msg = ''
 	m = msg.split()
+	if len(m) > 2:
+		new_msg = 'De ' + m[0] + ' para ' + m[1] + ' captura ' + m[2]
+	else:
+		new_msg = 'De ' + m[0] + ' para ' + m[1]
 
+	return new_msg
 	
 
 def load_map(filename):
@@ -163,21 +169,8 @@ def turno_maquina(estado_atual, vermelho, alpha, beta):
 	max_index = random.randint(0, len(indices) - 1)
 
 	estado_atual = copy.deepcopy(children[max_index])
-
-	msg = ''
-	for i in range(len(old_list)):
-		if vermelho:
-			if old_list[i] != estado_atual.pos_vermelhas[i]:
-				print "De: " + str(old_list[i])
-				print "Para: " + str(estado_atual.pos_vermelhas[i])
-				msg = str(old_list[i]) + ' ' + str(estado_atual.pos_vermelhas[i])
-		else:
-			if old_list[i] != estado_atual.pos_amarelas[i]:
-				print "De: " + str(old_list[i])
-				print "Para: " + str(estado_atual.pos_amarelas[i])
-				msg = str(old_list[i]) + ' ' + str(estado_atual.pos_amarelas[i])
-
-	return estado_atual, msg
+	
+	return estado_atual
 
 def jogo(estado, jogador):
 	alpha = -sys.maxint
@@ -199,7 +192,7 @@ def jogo(estado, jogador):
 				num_old = estado_atual.pos_vermelhas.count(None)
 				old_list = copy.deepcopy(estado_atual.pos_amarelas)
 
-			estado_atual, msg = turno_maquina(estado_atual, vermelho, alpha, beta)
+			estado_atual = turno_maquina(estado_atual, vermelho, alpha, beta)
 
 			if vermelho:
 				envia_msg(formata_msg(msg), UDP_PORT_VERMELHO)
@@ -215,7 +208,17 @@ def jogo(estado, jogador):
 			if num_old < num_new:
 				estado_atual = massacre(estado_atual, vermelho)
 
-			
+			for i in range(len(old_list)):
+				if vermelho:
+					if old_list[i] != estado_atual.pos_vermelhas[i]:
+						print "De: " + str(old_list[i])
+						print "Para: " + str(estado_atual.pos_vermelhas[i])
+						msg = str(old_list[i]) + ' ' + str(estado_atual.pos_vermelhas[i])
+				else:
+					if old_list[i] != estado_atual.pos_amarelas[i]:
+						print "De: " + str(old_list[i])
+						print "Para: " + str(estado_atual.pos_amarelas[i])
+						msg = str(old_list[i]) + ' ' + str(estado_atual.pos_amarelas[i])
 
 		else:
 			result = recebe()
