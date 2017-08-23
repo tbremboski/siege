@@ -1,5 +1,5 @@
 import sys, json, copy, time, socket, random
-MAX_DEPTH = 1
+MAX_DEPTH = 3
 UDP_IP = "127.0.0.1"
 UDP_PORT_VERMELHO = 5001
 UDP_PORT_AMARELO = 5002
@@ -55,65 +55,79 @@ def is_final(estado):
 	else:
 		return False
 
-def h(estado, vermelho):
+def h(estado, vermelho, depth):
+	md = MAX_DEPTH+1
 	pa = len(estado.pos_amarelas) - estado.pos_amarelas.count(None)
 	pv = len(estado.pos_vermelhas) - estado.pos_vermelhas.count(None)
 
-	# sumv = 0.0
-	# suma = 0.0
-	# for pos in estado.pos_vermelhas:
-	# 	if pos is not None:
-	# 		sumv += (ord(pos[0]) - 96)
-	# for pos in estado.pos_amarelas:
-	# 	if pos is not None:
-	# 		suma += (ord(pos[0]) - 96)
-	# sumv /= pv
-	# suma /= pa
+	sumv = 0.0
+	suma = 0.0
+	for pos in estado.pos_vermelhas:
+		if pos is not None:
+			sumv += (ord(pos[0]) - 96)
+	for pos in estado.pos_amarelas:
+		if pos is not None:
+			suma += (ord(pos[0]) - 96)
+	sumv /= (pv+1)
+	suma /= (pa+1)
 
-	# if 'h1' in estado.pos_amarelas:
-	# 	h1 = 1
-	# else:
-	# 	h1 = 0
+	if 'h1' in estado.pos_amarelas:
+		h1_a = 1
+	else:
+		h1_a = 0
 
-	# ha = (pa - pv)*10.0 + h1*1.0 + suma
-	# hv = (pv - pa)*10.0 - h1*1.0 + sumv
+	if 'h1' in estado.pos_vermelhas:
+		h1_v = 1
+	else:
+		h1_v = 0
+
+	ha = (pa - pv)*200.0 + h1_a*5.0 + suma - h1_v*10000.0 + (md-depth)*1000 + (8-pv)*100
+	hv = (pv - pa)*200.0 - h1_a*5.0 + sumv + h1_v*10000.0 + (md-depth)*1000
 	
 	if vermelho:
-		return (pv - pa)*10
+		# print "sumv: " + str(sumv)
+		# print "h1: " + str(h1*1.0)
+		# print "pecas: " + str((pv-pa)*10.0)
+		# print "hv: " + str(hv)
+		return hv
 	else:
-		return (pa - pv)*10
+		# print "suma: " + str(suma)
+		# print "h1: " + str(h1*1.0)
+		# print "pecas: " + str((pa-pv)*10.0)
+		# print "ha: " + str(ha)
+		return ha
 
 def minimax(estado, depth, maximize, alpha, beta, vermelho):
-	if depth == MAX_DEPTH or is_final(estado):
-		return h(estado, vermelho)
+	if depth == MAX_DEPTH or is_final(estado[-1]):
+		return h(estado[-1], vermelho, depth)
 
 	if maximize:
 		best = -sys.maxint
-		children = get_children(estado, vermelho)
+		children = get_children(estado[-1], vermelho)
 
 		for child in children:
 			v = minimax(child, depth+1, False, alpha, beta, vermelho)
 			best = max(best, v)
+			alpha = max(best, alpha)
 
-			if best >= beta:
-				return beta
-			else:
-				alpha = max(best, alpha)
+			if beta <= alpha:
+				break
+
+		return best
 
 	else:
 		best = sys.maxint
-		children = get_children(estado, not vermelho)
+		children = get_children(estado[-1], not vermelho)
 
 		for child in children:
 			v = minimax(child, depth+1, True, alpha, beta, vermelho)
 			best = min(best, v)
+			beta = min(best, beta)
 
-			if best <= alpha:
-				return alpha
-			else:
-				beta = min(best, beta)
+			if beta <= alpha:
+				break
 
-	return best
+		return best
 
 def get_children(estado, vermelho):
 	r = []
@@ -127,18 +141,21 @@ def get_children(estado, vermelho):
 					if c[1] in estado.pos_amarelas:
 						if c[2] not in estado.pos_vermelhas:
 							if c[2] not in estado.pos_amarelas:
+								tmp = []
 								novo_estado = copy.deepcopy(estado)
 								novo_estado.pos_vermelhas[i] = c[2]
 								novo_estado.pos_amarelas[novo_estado.pos_amarelas.index(c[1])] = None
-								novo_estado = massacre(novo_estado, vermelho, True)
-								r.append(novo_estado)
+								tmp.append(novo_estado)
+								n_e, _ = massacre(novo_estado, vermelho)
+								tmp.extend(n_e)
+								r.append(tmp)
 
 				for v in vizinhos[peca]:
 					if v not in estado.pos_vermelhas:
 						if v not in estado.pos_amarelas:
 							novo_estado = copy.deepcopy(estado)
 							novo_estado.pos_vermelhas[i] = v
-							r.append(novo_estado)
+							r.append([novo_estado])
 
 	else:
 		for i in range(len(estado.pos_amarelas)):
@@ -149,18 +166,21 @@ def get_children(estado, vermelho):
 					if c[1] in estado.pos_vermelhas:
 						if c[2] not in estado.pos_vermelhas:
 							if c[2] not in estado.pos_amarelas:
+								tmp = []
 								novo_estado = copy.deepcopy(estado)
 								novo_estado.pos_amarelas[i] = c[2]
 								novo_estado.pos_vermelhas[novo_estado.pos_vermelhas.index(c[1])] = None
-								novo_estado = massacre(novo_estado, vermelho, True)
-								r.append(novo_estado)
+								tmp.append(novo_estado)
+								n_e, _ = massacre(novo_estado, vermelho)
+								tmp.extend(n_e)
+								r.append(tmp)
 
 				for v in vizinhos[peca]:
 					if v not in estado.pos_amarelas:
 						if v not in estado.pos_vermelhas:
 							novo_estado = copy.deepcopy(estado)
 							novo_estado.pos_amarelas[i] = v
-							r.append(novo_estado)
+							r.append([novo_estado])
 
 	return r
 
@@ -171,10 +191,12 @@ def turno_maquina(estado_atual, vermelho, alpha, beta):
 	for i in range(len(children)):
 		values.append(minimax(children[i], 0, False, alpha, beta, vermelho))
 
+	print "Valores: " + str(values)
 	max_value = max(values)
 	print "Heuristica: " + str(max_value)
 	indices = [i for i, x in enumerate(values) if x == max_value]
 	max_index = random.randint(0, len(indices) - 1)
+	print "Indice: " + str(indices[max_index])
 
 	if vermelho:
 		num_old = estado_atual.pos_amarelas.count(None)
@@ -183,7 +205,7 @@ def turno_maquina(estado_atual, vermelho, alpha, beta):
 		num_old = estado_atual.pos_vermelhas.count(None)
 		old_list = copy.deepcopy(estado_atual.pos_amarelas)
 
-	estado_atual = copy.deepcopy(children[max_index])
+	estado_atual = copy.deepcopy(children[indices[max_index]][0])
 
 	if vermelho:
 		num_new = estado_atual.pos_amarelas.count(None)
@@ -224,13 +246,25 @@ def turno_maquina(estado_atual, vermelho, alpha, beta):
 	recebe()
 
 	if captura:
-		estado_atual = massacre(estado_atual, vermelho, False)
+		ests, movs = massacre(estado_atual, vermelho)
+	else:
+		ests = []
+		movs = []
 
 	if vermelho:
+		for m in movs:
+			envia_msg(formata_msg(m), UDP_PORT_VERMELHO)
+			recebe()
 		envia_msg('fim', UDP_PORT_VERMELHO)
 	else:
+		for m in movs:
+			envia_msg(formata_msg(m), UDP_PORT_AMARELO)
+			recebe()
 		envia_msg('fim', UDP_PORT_AMARELO)
 	
+	if len(ests) > 0:
+		estado_atual = ests[-1]
+
 	return estado_atual
 
 def jogo(estado, jogador):
@@ -246,7 +280,9 @@ def jogo(estado, jogador):
 			print "\nTurno amarelo!"
 			
 		if jogador:
+			print estado_atual.pos_vermelhas if vermelho else estado_atual.pos_amarelas
 			estado_atual = turno_maquina(estado_atual, vermelho, alpha, beta)
+			# raw_input("Aperte enter")
 
 		else:
 			result = recebe()
@@ -269,10 +305,12 @@ def jogo(estado, jogador):
 	else:
 		print "Exercito vermelho venceu!"
 
-def massacre(estado, vermelho, is_minimax):
+def massacre(estado, vermelho):
 	# print "Captura realizada!"
+	r = []
+	mov = []
 	comeu = False
-	estado_retorno = estado
+	estado_retorno = copy.deepcopy(estado)
 	if not is_final(estado_retorno):
 		if vermelho:
 			for pv in estado_retorno.pos_vermelhas:
@@ -281,18 +319,14 @@ def massacre(estado, vermelho, is_minimax):
 						if cap[1] in estado_retorno.pos_amarelas:
 							if cap[2] not in estado_retorno.pos_vermelhas:
 								if cap[2] not in estado_retorno.pos_amarelas:
-									# print estado_retorno.pos_vermelhas
-									# print estado_retorno.pos_amarelas
-									# print cap[0]
-									# print cap[1]
-									# print cap[2]
 									estado_retorno.pos_amarelas[estado_retorno.pos_amarelas.index(cap[1])] = None
 									estado_retorno.pos_vermelhas[estado_retorno.pos_vermelhas.index(pv)] = cap[2]
-									if not is_minimax:
-										msg = cap[0] + ' ' + cap[2] + ' ' + cap[1]
-										envia_msg(formata_msg(msg), UDP_PORT_VERMELHO)
-										recebe()
-									estado_retorno = massacre(estado_retorno, vermelho, is_minimax)
+									r.append(estado_retorno)
+									msg = cap[0] + ' ' + cap[2] + ' ' + cap[1]
+									mov.append(msg)
+									e, m = massacre(estado_retorno, vermelho)
+									r.extend(e)
+									mov.extend(m)
 									comeu = True
 									break
 				if comeu:
@@ -304,24 +338,21 @@ def massacre(estado, vermelho, is_minimax):
 						if cap[1] in estado_retorno.pos_vermelhas:
 							if cap[2] not in estado_retorno.pos_vermelhas:
 								if cap[2] not in estado_retorno.pos_amarelas:
-									# print estado_retorno.pos_vermelhas
-									# print estado_retorno.pos_amarelas
-									# print cap[0]
-									# print cap[1]
-									# print cap[2]
 									estado_retorno.pos_vermelhas[estado_retorno.pos_vermelhas.index(cap[1])] = None
 									estado_retorno.pos_amarelas[estado_retorno.pos_amarelas.index(pa)] = cap[2]
-									if not is_minimax:
-										msg = cap[0] + ' ' + cap[2] + ' ' + cap[1]
-										envia_msg(formata_msg(msg), UDP_PORT_AMARELO)
-										recebe()
-									estado_retorno = massacre(estado_retorno, vermelho, is_minimax)
+									r.append(estado_retorno)
+									msg = cap[0] + ' ' + cap[2] + ' ' + cap[1]
+									mov.append(msg)
+									e, m = massacre(estado_retorno, vermelho)
+									r.extend(e)
+									mov.extend(m)
 									comeu = True
 									break
 				if comeu:
 					break
 
-	return copy.deepcopy(estado_retorno)
+	# print r, mov
+	return r, mov
 
 def main(argv):
 	jogador = None
